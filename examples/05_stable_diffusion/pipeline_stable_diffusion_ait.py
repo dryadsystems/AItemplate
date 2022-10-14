@@ -84,8 +84,7 @@ class StableDiffusionAITPipeline(StableDiffusionPipeline):
             safety_checker=safety_checker,
             feature_extractor=feature_extractor,
         )
-
-        workdir = "tmp/"
+        workdir = os.getenv("AIT_WORKDIR", "tmp/")
         self.clip_ait_exe = self.init_ait_module(
             model_name="CLIPTextModel", workdir=workdir
         )
