@@ -56,5 +56,5 @@ ADD ./static /AITemplate/static
 ADD ./licenses /AITemplate/licenses
 ADD ./docker/install/install_ait.sh /AITemplate/
 RUN bash /AITemplate/install_ait.sh
-COPY ./build.py /AITemplate/build.py
-ENTRYPOINT ["/usr/bin/python", "/AITemplate/build.py"]
+COPY ./build.py /AITemplate/build.sh
+ENTRYPOINT ["/bin/bash", "/AITemplate/build.sh"]
