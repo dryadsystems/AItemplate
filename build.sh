@@ -1,10 +1,11 @@
 #!/bin/bash
-set -o xtrace -o pipefile
+set -o xtrace -o pipefail
 python3 examples/05_stable_diffusion/compile.py --token "$HF_TOKEN"
 # clip is shared, unet and autoencoder are compiled to be bigger for img2img
 #python3 examples/05_stable_diffusion/compile.py --img2img True --token $HF_TOKEN
 
-find /root/.cache
+
+find /root/.cache/huggingface
 TODAY=$(date '+%Y-%m-%d')
 tar c ./tmp/CLIPTextModel ./tmp/UNet2DConditionModel ./tmp/AutoencoderKL -f "./ait-verdant-$TODAY.tar"
 echo "$RCLONE_CONF" | base64 -d > rclone.conf
