@@ -39,6 +39,9 @@ def _detect_cuda():
         compat = ["A100", "RTX 30", "A10", "A30", "A40", "A45", "A50", "A60"]
         if any(gpu in stdout for gpu in compat):
             return "80"
+        # can check https://developer.nvidia.com/cuda-gpus to add yours
+        if "GTX 1650" in stdout:
+            return "75"
         if "T4" in stdout:
             if os.environ.get("CI_FLAG", None) == "CIRCLECI":
                 return "75"

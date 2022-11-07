@@ -560,30 +560,30 @@ class CLIPVisionEmbeddings(nn.Module):
         self.register_buffer(
             "position_ids",
             Tensor(
-                # yeesh, python...
+                # yeesh, python... no ait arange equivalent?
                 shape=[1, self.num_positions], value=[list(range(self.num_positions))]
             ),
         )
 
     def forward(self, pixel_values: Tensor) -> Tensor:
 
-        input_shape = ops.size()(input_ids)
+        batch_size = get_shape(pixel_values)[0]
 
-        # [B * S]
-        input_ids = ops.reshape()(input_ids, [-1])
+        patch_embeds = self.patch_embedding(pixel_values)  # shape = [*, width, grid, grid]
+        patch_embeds = ops.flatten()(patch_embeds, 2)
+        # .transpose(1, 2) # okay fuck it, this is definitely wrong but might compile...
+        shape = get_shape(patch_embeds)
+        # "transpose" dims 1 and 2 
+        shape[1], shape[2] = shape[2], shape[1]
+        patch_embeds = ops.reshape()(patch_embeds, shape)
 
-        position_ids = ops.reshape()(position_ids, [-1])
+        class_embeds = ops.expand()(self.class_embedding, [batch_size, 1, -1])
+        embeddings = ops.concatenate([class_embeds, patch_embeds], dim=1)
+        # position_embeddings = ops.batch_gather()(
+        #     self.position_embedding.tensor(), position_ids
+        # )
 
-        if inputs_embeds is None:
-            inputs_embeds = ops.batch_gather()(self.token_embedding.tensor(), input_ids)
-
-        position_embeddings = ops.batch_gather()(
-            self.position_embedding.tensor(), position_ids
-        )
-
-        embeddings = inputs_embeds + position_embeddings
-
-        embeddings = ops.reshape()(embeddings, [input_shape[0], input_shape[1], -1])
+        embeddings = embeddings + self.position_embedding(self.position_ids)
 
         return embeddings
 
