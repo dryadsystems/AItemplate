@@ -16,10 +16,12 @@ from inspect import isfunction
 from typing import Optional
 
 from aitemplate.compiler import ops
-from aitemplate.frontend import nn, Tensor
+from aitemplate.frontend import nn, Tensor, Parameter
 from aitemplate.testing import detect_target
 
-# pylint: disable=W0102
+import torch
+
+# pylint: disable=dangerous-default-value
 
 USE_CUDA = detect_target().name() == "cuda"
 
@@ -518,6 +520,147 @@ class CLIPTextEmbeddings(nn.Module):
         embeddings = ops.reshape()(embeddings, [input_shape[0], input_shape[1], -1])
 
         return embeddings
+
+
+class CLIPVisionEmbeddings(nn.Module):
+    def __init__(
+        self,
+        hidden_size=768,
+        patch_size=32,
+        image_size=244,
+        dtype="float16",
+        # vocab_size=49408,
+        # max_position_embeddings=77,
+    ):
+        super().__init__()
+        embed_dim = hidden_size
+        self.token_embedding = nn.Embedding(shape=[vocab_size, embed_dim], dtype=dtype)
+        self.position_embedding = nn.Embedding(
+            shape=[max_position_embeddings, embed_dim], dtype=dtype
+        )
+        ####
+
+        self.class_embedding = Parameter(torch.randn(embed_dim))  # hm, torch
+        # but then this should always be from_pretrained'd?
+
+        self.patch_embedding = nn.Conv2d(
+            in_channels=3,
+            out_channels=embed_dim,
+            kernel_size=patch_size,
+            stride=patch_size,
+            # bias=False, # no bias parameter? not sure if this is wrong
+        )
+
+        self.num_patches = (image_size // patch_size) ** 2
+        self.num_positions = self.num_patches + 1
+        self.position_embedding = nn.Embedding(shape=[self.num_positions, embed_dim])
+        # self.register_buffer(
+        #     "position_ids", torch.arange(self.num_positions).expand((1, -1))
+        # )
+        self.register_buffer(
+            "position_ids",
+            Tensor(
+                # yeesh, python...
+                shape=[1, self.num_positions], value=[list(range(self.num_positions))]
+            ),
+        )
+
+    def forward(self, pixel_values: Tensor) -> Tensor:
+
+        input_shape = ops.size()(input_ids)
+
+        # [B * S]
+        input_ids = ops.reshape()(input_ids, [-1])
+
+        position_ids = ops.reshape()(position_ids, [-1])
+
+        if inputs_embeds is None:
+            inputs_embeds = ops.batch_gather()(self.token_embedding.tensor(), input_ids)
+
+        position_embeddings = ops.batch_gather()(
+            self.position_embedding.tensor(), position_ids
+        )
+
+        embeddings = inputs_embeds + position_embeddings
+
+        embeddings = ops.reshape()(embeddings, [input_shape[0], input_shape[1], -1])
+
+        return embeddings
+
+
+class CLIPVisionTransformer(nn.Module):
+    def __init__(
+        self,
+        hidden_size=768,
+        output_attentions=False,
+        output_hidden_states=False,
+        use_return_dict=False,
+        num_hidden_layers=12,
+        num_attention_heads=12,
+        batch_size=1,
+        seq_len=64,
+        causal=False,
+        mask_seq=0,
+    ):
+        super().__init__()
+        embed_dim = hidden_size
+        self.embeddings = CLIPVisionEmbeddings()
+        self.pre_layer_norm = nn.LayerNorm(embed_dim)
+        self.encoder = CLIPEncoder(
+            num_hidden_layers=num_hidden_layers,
+            hidden_size=hidden_size,
+            num_attention_heads=num_attention_heads,
+            batch_size=batch_size,
+            seq_len=seq_len,
+            causal=causal,
+            mask_seq=mask_seq,
+        )
+        self.final_layer_norm = nn.LayerNorm(embed_dim)
+        # ait
+        self.output_attentions = output_attentions
+        self.output_hidden_states = output_hidden_states
+        self.use_return_dict = use_return_dict
+
+    def forward(
+        self,
+        pixel_values: Tensor,  # ..optional?
+        output_attentions: Optional[bool] = None,
+        output_hidden_states: Optional[bool] = None,
+        return_dict: Optional[bool] = None,
+    ):
+        r"""
+        Returns:
+        """
+        output_attentions = (
+            output_attentions
+            if output_attentions is not None
+            else self.output_attentions
+        )
+        output_hidden_states = (
+            output_hidden_states
+            if output_hidden_states is not None
+            else self.output_hidden_states
+        )
+        return_dict = return_dict if return_dict is not None else self.use_return_dict
+
+        # if pixel_values is None:
+        #     raise ValueError("You have to specify either input_ids")
+
+        hidden_states = self.embeddings(pixel_values)
+        hidden_states = self.pre_layrnorm(hidden_states)
+
+        encoder_outputs = self.encoder(
+            inputs_embeds=hidden_states,
+        )
+
+        last_hidden_state = encoder_outputs
+        # from transformers:
+        # last_hidden_state = encoder_outputs[0]
+        # pooled_output = last_hidden_state[:, 0, :]
+        # but then transformers' CLIPTextTransformer has pooling stuff ait doesn't use
+
+        last_hidden_state = self.final_layer_norm(last_hidden_state)
+        return last_hidden_state
 
 
 class CLIPTextTransformer(nn.Module):
