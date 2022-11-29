@@ -85,14 +85,12 @@ class CrossAttention(nn.Module):
         )
 
         if USE_CUDA:
-            q = q * self.scale
-            attn = ops.bmm_rcr()(
-                (ops.reshape()(q, [bs * nheads, -1, d])),
-                (ops.reshape()(k, [bs * nheads, -1, d])),
+            attn_op = ops.mem_eff_attention(causal=False)
+            out = attn_op(
+                (ops.reshape()(q, [bs, nheads, -1, d])),
+                (ops.reshape()(k, [bs, nheads, -1, d])),
+                (ops.reshape()(v, [bs, nheads, -1, d])),
             )
-            attn = ops.softmax()(attn, -1)
-            v = ops.reshape()(v, [bs * nheads, -1, d])
-            out = ops.bmm_rrr_permute((nheads,))(attn, v)
         else:
             OP = ops.bmm_softmax_bmm_permute(shape=(nheads,), scale=self.scale)
             out = OP(
@@ -309,14 +307,13 @@ class CLIPMLP(nn.Module):
         self.fc1 = nn.Linear(
             in_features,
             hidden_features,
+            specialization="gelu",
         )
-        self.activation_fn = QuickGELUActivation()
         self.fc2 = nn.Linear(hidden_features, out_features, specialization="add")
 
     def forward(self, x, res):
         shape = get_shape(x)
         x = self.fc1(x)
-        x = self.activation_fn(x)
         x = self.fc2(x, res)
         return ops.reshape()(x, shape)
 
@@ -346,6 +343,7 @@ class CLIPEncoderLayer(nn.Module):
             has_residual=True,
             causal=causal,
             mask_seq=mask_seq,
+            use_mem_eff=True,
         )
         self.layer_norm1 = nn.LayerNorm(self.embed_dim)
         self.mlp = CLIPMLP(hidden_size, int(hidden_size * mlp_ratio))
@@ -536,7 +534,7 @@ class CLIPTextTransformer(nn.Module):
     ):
         super().__init__()
         embed_dim = hidden_size
-        self.embeddings = CLIPTextEmbeddings()
+        self.embeddings = CLIPTextEmbeddings(hidden_size=hidden_size)
         self.encoder = CLIPEncoder(
             num_hidden_layers=num_hidden_layers,
             hidden_size=hidden_size,

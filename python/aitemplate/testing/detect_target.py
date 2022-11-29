@@ -39,11 +39,10 @@ def _detect_cuda():
         compat = ["A100", "RTX 30", "A10", "A30", "A40", "A45", "A50", "A60"]
         if any(gpu in stdout for gpu in compat):
             return "80"
+        if "V100" in stdout:
+            return "70"
         if "T4" in stdout:
-            if os.environ.get("CI_FLAG", None) == "CIRCLECI":
-                return "75"
-            else:
-                return None
+            return "75"
         return None
     except Exception:
         return None
@@ -78,7 +77,6 @@ def detect_target(**kwargs):
             return CUDA(arch=FLAG, **kwargs)
         else:
             return ROCM(arch=FLAG, **kwargs)
-
     doc_flag = os.getenv("BUILD_DOCS", None)
     if doc_flag is not None:
         return CUDA(arch="80", **kwargs)

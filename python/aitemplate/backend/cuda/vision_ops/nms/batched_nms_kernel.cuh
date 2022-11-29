@@ -11,8 +11,6 @@
 //  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
-//
-// CUDA batched_nms kernel
 
 int const threadsPerBlock = sizeof(unsigned long long int) * 8;
 #define THREADS_PER_BLOCK 256
