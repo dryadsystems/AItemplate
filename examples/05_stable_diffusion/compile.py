@@ -325,8 +325,9 @@ def compile_vae(
 @click.option("--batch-size", default=1, help="batch size")
 @click.option("--use-fp16-acc", default=True, help="use fp16 accumulation")
 @click.option("--convert-conv-to-gemm", default=True, help="convert 1x1 conv to gemm")
+@click.option("--model", default="stabilityai/stable-diffusion-2-base", help="convert 1x1 conv to gemm")
 def compile_diffusers(
-    token, width, height, batch_size, use_fp16_acc=True, convert_conv_to_gemm=True
+    token, width, height, batch_size, model, use_fp16_acc=True, convert_conv_to_gemm=True
 ):
     logging.getLogger().setLevel(logging.INFO)
     np.random.seed(0)
@@ -340,7 +341,7 @@ def compile_diffusers(
         access_token = token
 
     pipe = StableDiffusionPipeline.from_pretrained(
-        "stabilityai/stable-diffusion-2",
+        model,
         revision="fp16",
         torch_dtype=torch.float16,
         use_auth_token=access_token,
