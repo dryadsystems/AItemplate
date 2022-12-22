@@ -36,7 +36,7 @@ def _detect_cuda():
         )
         stdout, stderr = proc.communicate()
         stdout = stdout.decode("utf-8")
-        compat = ["A100", "RTX 30", "A10", "A30", "A40", "A45", "A50", "A60"]
+        compat = ["A100", "RTX 30", "A10", "A30", "A40", "A45", "A50", "A60", "4090"]
         if any(gpu in stdout for gpu in compat):
             return "80"
         if "V100" in stdout:
