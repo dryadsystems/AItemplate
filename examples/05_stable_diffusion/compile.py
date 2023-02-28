@@ -325,7 +325,8 @@ def compile_vae(
 @click.option("--batch-size", default=1, help="batch size")
 @click.option("--use-fp16-acc", default=True, help="use fp16 accumulation")
 @click.option("--convert-conv-to-gemm", default=True, help="convert 1x1 conv to gemm")
-@click.option("--model", default="stabilityai/stable-diffusion-2-base", help="convert 1x1 conv to gemm")
+#@click.option("--model", default="stabilityai/stable-diffusion-2-base", help="convert 1x1 conv to gemm")
+@click.option("--model", default="CompVis/stable-diffusion-v1-4", help="convert 1x1 conv to gemm")
 def compile_diffusers(
     token, width, height, batch_size, model, use_fp16_acc=True, convert_conv_to_gemm=True
 ):
