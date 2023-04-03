@@ -33,6 +33,14 @@ def mark_output(y):
 
 
 class crossattentionTestCase(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        torch.manual_seed(0)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.test_id = 0
+
     def _test_mha(
         self,
         batch_sizes,
@@ -81,7 +89,11 @@ class crossattentionTestCase(unittest.TestCase):
         )
         ait_mod.name_parameter_tensor()
 
-        batch_dim = shape_utils.gen_int_var_min_max(batch_sizes, name="batch_size")
+        if len(batch_sizes) == 1:
+            # static
+            batch_dim = batch_sizes[0]
+        else:
+            batch_dim = shape_utils.gen_int_var_min_max(batch_sizes, name="batch_size")
 
         inputs_ait = Tensor([batch_dim, seqlen, dim], name="input0", is_input=True)
         inputs_ait_k = Tensor([batch_dim, seqlen_kv, dim], name="input1", is_input=True)
@@ -90,7 +102,10 @@ class crossattentionTestCase(unittest.TestCase):
         Y = Y + inputs_ait
         mark_output(Y)
         target = detect_target(use_fp16_acc=False)
-        exe_module = compile_model(Y, target, "./tmp", "cross_attn_dynamic")
+        exe_module = compile_model(
+            Y, target, "./tmp", f"cross_attn_dynamic_{self.test_id}"
+        )
+        self.test_id += 1
         for name, weight in params_ait.items():
             exe_module.set_constant_with_tensor(name, weight)
 
@@ -107,7 +122,7 @@ class crossattentionTestCase(unittest.TestCase):
             pt_ys = pt_ys + input_pt
             print("pt output:", pt_ys.shape)
 
-            inputs = [input_pt, input_pt_k, input_pt_v]
+            inputs = {"input0": input_pt, "input1": input_pt_k, "input2": input_pt_v}
             ys = [torch.empty(pt_ys.shape).cuda().half()]
             exe_module.run_with_tensors(inputs, ys)
             eps = 1e-2
@@ -119,15 +134,20 @@ class crossattentionTestCase(unittest.TestCase):
             )
             print("Batch {} MHA verification pass".format(batch_size))
 
+    @unittest.skipIf(
+        detect_target().name() == "cuda" and int(detect_target()._arch) < 80,
+        "Not supported by cuda sm<80",
+    )
     def test_cross_attn(self):
+        self._test_mha(batch_sizes=[1], seqlen=2, seqlen_kv=32, dim=512, num_heads=8)
         self._test_mha(
             batch_sizes=[128, 256, 512], seqlen=1, seqlen_kv=62, dim=512, num_heads=8
         )
         self._test_mha(
             batch_sizes=[1, 32, 64], seqlen=128, seqlen_kv=62, dim=512, num_heads=8
         )
+        self._test_mha(batch_sizes=[128], seqlen=1, seqlen_kv=4, dim=16, num_heads=2)
 
 
 if __name__ == "__main__":
-    torch.manual_seed(0)
     unittest.main()

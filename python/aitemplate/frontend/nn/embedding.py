@@ -12,14 +12,13 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 #
+from aitemplate.compiler import ops
+from aitemplate.compiler.public import FuncEnum
+from aitemplate.frontend.nn.dropout import Dropout
+from aitemplate.frontend.nn.layer_norm import LayerNorm
+from aitemplate.frontend.nn.module import Module
+from aitemplate.frontend.nn.parameter import Parameter
 from aitemplate.testing import detect_target
-
-from ...compiler import ops
-from ...compiler.public import FuncEnum
-from .dropout import Dropout
-from .layer_norm import LayerNorm
-from .module import Module
-from .parameter import Parameter
 
 
 class Embedding(Module):
@@ -46,11 +45,10 @@ class Embedding(Module):
         return self.weight.tensor()
 
 
-USE_CUDA = detect_target().name() == "cuda"
-
-
 class BertEmbeddings(Module):
     """Construct the embeddings from word, position and token_type embeddings."""
+
+    USE_CUDA = None
 
     def __init__(
         self,
@@ -63,6 +61,8 @@ class BertEmbeddings(Module):
         dtype="float16",
     ):
         super().__init__()
+        if BertEmbeddings.USE_CUDA is None:
+            BertEmbeddings.USE_CUDA = detect_target().name() == "cuda"
         assert (
             hidden_dropout_prob == 0.0
         ), "Dropout rate larger than 0 is not supported yet."
@@ -85,7 +85,7 @@ class BertEmbeddings(Module):
         token_type_ids,  # [B, S]
         position_ids,  # [B, S]
     ):
-        if USE_CUDA:
+        if self.USE_CUDA:
             embeddings = ops.bert_embeddings()(
                 input_ids,
                 token_type_ids,
